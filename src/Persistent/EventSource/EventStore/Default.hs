@@ -26,19 +26,36 @@ defaultStoreMany :: (PersistRecordBackend record SqlBackend, Typeable record, Mo
 #endif
 defaultStoreMany = insertMany
 
+#if MIN_VERSION_persistent(2,14,0)
+defaultGetLastAppliedEventId :: (PersistEntity record, Typeable record,
+                             MonadSqlQuery m,
+                             PersistEntityBackend record ~ SqlBackend,
+                             SafeToInsert record) =>
+                            EntityField record typ -> (record -> b) -> m (Maybe b)
+#else
 defaultGetLastAppliedEventId :: (PersistEntity record, Typeable record,
                              MonadSqlQuery m,
                              PersistEntityBackend record ~ SqlBackend) =>
                             EntityField record typ -> (record -> b) -> m (Maybe b)
+#endif
 defaultGetLastAppliedEventId sortField extractId = do
     lastEvent <- selectFirst [] [Desc sortField]
     pure $ (extractId . entityVal) <$> lastEvent
 
+#if MIN_VERSION_persistent(2,14,0)
+defaultMarkEventsApplied :: (MonadIO m, PersistEntity record,
+                                   Typeable record,
+                                   MonadSqlQuery m,
+                                   PersistEntityBackend record ~ SqlBackend,
+                                   SafeToInsert record) =>
+                                  (t -> Key record) -> (UTCTime -> t -> record) -> [t] -> m ()
+#else
 defaultMarkEventsApplied :: (MonadIO m, PersistEntity record,
                                    Typeable record,
                                     MonadSqlQuery m,
                                    PersistEntityBackend record ~ SqlBackend) =>
                                   (t -> Key record) -> (UTCTime -> t -> record) -> [t] -> m ()
+#endif
 defaultMarkEventsApplied toKey toRecord eventIds = do
     appliedEvents <- forM eventIds $ \eventId -> do
       time' <- liftIO getCurrentTime
